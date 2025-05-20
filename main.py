@@ -41,6 +41,12 @@ INFO_TEXT = """ℹ️ Инфо
 
 Если есть вопросы — пиши: @sunxbeach_director"""
 
+def generate_wide_label(step_num, total_min):
+    h = int(total_min) // 60
+    m = int(total_min) % 60
+    time_str = f"{h}ч {m}м" if h else f"{m}м"
+    return f"Шаг {step_num:<2} ({time_str})"
+
 def step_keyboard():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     for i in range(0, 12, 4):
@@ -52,7 +58,7 @@ def step_keyboard():
                 total = sum(p['duration_min'] for p in s['positions'])
                 h = int(total) // 60
                 m = int(total) % 60
-                label = f"{h}ч {m}м" if h else f"{m}м"
+                label = generate_wide_label(step_num, total)
                 row.append(types.KeyboardButton(f"Шаг {s['step']} ({label})"))
         kb.row(*row)
     kb.add(types.KeyboardButton("ℹ️ Инфо"))
