@@ -130,7 +130,7 @@ async def run_step(chat_id, user_id):
         if user_state.get(user_id) is None:
             return
         state["pos"] += 1
-    await bot.send_message(chat_id, "Шаг завершён ✅", reply_markup=step_keyboard())
+    await bot.send_message(chat_id, "Шаг завершён ✅", reply_markup=exit_keyboard())
     user_state.pop(user_id, None)
 
 if __name__ == "__main__":
