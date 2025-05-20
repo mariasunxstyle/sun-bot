@@ -59,6 +59,14 @@ def step_keyboard():
     return kb
 
 def control_keyboard():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add("⏭️ Пропустить")
+    kb.add("⛔ Завершить")
+    kb.add("↩️ Назад на 2 шага")
+    kb.add("📋 Вернуться к шагам")
+    return kb
+
+
     kb = InlineKeyboardMarkup()
     kb.add(InlineKeyboardButton("⏭️ Пропустить", callback_data="skip"))
     kb.add(InlineKeyboardButton("⛔ Завершить", callback_data="stop"))
@@ -75,6 +83,7 @@ async def info(message: types.Message):
     await message.answer(INFO_TEXT)
 
 @dp.message_handler(lambda msg: msg.text.startswith("Шаг "))
+@dp.message_handler(lambda msg: msg.text in ["⏭️ Пропустить", "⛔ Завершить", "↩️ Назад на 2 шага", "📋 Вернуться к шагам"])
 async def start_step(message: types.Message):
     try:
         step_num = int(message.text.split()[1])
@@ -111,7 +120,7 @@ async def handle_controls(callback: types.CallbackQuery):
         await start_position_loop(chat_id, user_id)
     elif data == "stop":
         user_state.pop(user_id, None)
-        await bot.send_message(chat_id, "Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=step_keyboard())
+        await bot.send_message(chat_id, "Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=exit_keyboard())
     elif data == "back2":
         if state:
             new_step = max(1, state["step"] - 2)
