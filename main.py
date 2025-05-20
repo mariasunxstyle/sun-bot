@@ -112,7 +112,7 @@ async def run_step(chat_id, uid):
     state = user_state[uid]
     step = next(s for s in steps if s["step"] == state["step"])
     if state["pos"] >= len(step["positions"]):
-        await bot.send_message(chat_id, "Шаг завершён ✅", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add("▶️ Продолжить", "📋 Вернуться к шагам", "↩️ Назад на 2 шага", "⛔ Завершить"))
+        await bot.send_message(chat_id, "Шаг завершён ✅", reply_markup=control_keyboard())
         return
     pos = step["positions"][state["pos"]]
     await bot.send_message(chat_id, f"{pos['name']} — {pos['duration_min']} мин", reply_markup=control_keyboard())
