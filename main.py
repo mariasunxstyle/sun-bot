@@ -49,21 +49,22 @@ def generate_wide_label(step_num, total_min):
 
 def step_keyboard():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    for i in range(0, 12, 4):
-        row = []
-        for j in range(4):
-            idx = i + j
-            if idx < len(steps):
-                s = steps[idx]
-                total = sum(p['duration_min'] for p in s['positions'])
-                h = int(total) // 60
-                m = int(total) % 60
-                step_num = s['step']
-                label = generate_wide_label(step_num, total)
-                row.append(types.KeyboardButton(f"Шаг {s['step']} ({label})"))
+    row = []
+    for i, s in enumerate(steps):
+        total = sum(p['duration_min'] for p in s['positions'])
+        h = int(total) // 60
+        m = int(total) % 60
+        time_str = f"{h}ч {m}м" if h else f"{m}м"
+        label = f"{s['step']} ({time_str})"
+        row.append(types.KeyboardButton(label))
+        if (i + 1) % 4 == 0:
+            kb.row(*row)
+            row = []
+    if row:
         kb.row(*row)
     kb.add(types.KeyboardButton("ℹ️ Инфо"))
     return kb
+
 
 def control_keyboard():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -104,8 +105,7 @@ async def start_position_loop(chat_id, user_id):
     state = user_state[user_id]
     step = next(s for s in steps if s["step"] == state["step"])
     if state["pos"] == 0:
-        await bot.send_message(chat_id, f"Начинаем шаг {state['step']} ✅", reply_markup=control_keyboard())
-    while state["pos"] < len(step["positions"]):
+            while state["pos"] < len(step["positions"]):
         pos = step["positions"][state["pos"]]
         await bot.send_message(chat_id, f"{pos['name']} — {pos['duration_min']} мин")
         await asyncio.sleep(int(pos["duration_min"] * 60))
