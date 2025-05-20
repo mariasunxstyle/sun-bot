@@ -129,3 +129,18 @@ async def handle_controls(callback: types.CallbackQuery):
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
+
+@dp.message_handler(lambda msg: "Шаг" in msg.text and "(" in msg.text)
+async def select_step(message: types.Message):
+    try:
+        import re
+        match = re.search(r"Шаг (\d+)", message.text)
+        if match:
+            step_num = int(match.group(1))
+            step_data = next(s for s in steps if s["step"] == step_num)
+            user_state[message.from_user.id] = {"step": step_num, "pos": 0}
+            await run_step(message.chat.id, message.from_user.id)
+        else:
+            await message.answer("Не удалось определить номер шага.")
+    except:
+        await message.answer("Ошибка при запуске шага.")
