@@ -82,17 +82,6 @@ async def start(message: types.Message):
 async def info(message: types.Message):
     await message.answer(INFO_TEXT)
 
-@dp.message_handler(lambda msg: msg.text.startswith("Шаг "))
-@dp.message_handler(lambda msg: msg.text in ["⏭️ Пропустить", "⛔ Завершить", "↩️ Назад на 2 шага", "📋 Вернуться к шагам"])
-async def start_step(message: types.Message):
-    try:
-        step_num = int(message.text.split()[1])
-        step_data = next(s for s in steps if s["step"] == step_num)
-        user_state[message.from_user.id] = {"step": step_num, "pos": 0}
-        await start_position_loop(message.chat.id, message.from_user.id)
-    except:
-        await message.answer("Не удалось запустить шаг. Попробуй ещё раз.")
-
 async def start_position_loop(chat_id, user_id):
     state = user_state[user_id]
     step = next(s for s in steps if s["step"] == state["step"])
@@ -130,17 +119,21 @@ async def handle_controls(callback: types.CallbackQuery):
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
 
+
 @dp.message_handler(lambda msg: "Шаг" in msg.text and "(" in msg.text)
 async def select_step(message: types.Message):
     try:
         import re
         match = re.search(r"Шаг (\d+)", message.text)
-        if match:
-            step_num = int(match.group(1))
-            step_data = next(s for s in steps if s["step"] == step_num)
-            user_state[message.from_user.id] = {"step": step_num, "pos": 0}
-            await run_step(message.chat.id, message.from_user.id)
-        else:
-            await message.answer("Не удалось определить номер шага.")
-    except:
-        await message.answer("Ошибка при запуске шага.")
+        if not match:
+            await message.answer("Не удалось распознать номер шага.")
+            return
+        step_num = int(match.group(1))
+        step_data = next((s for s in steps if s["step"] == step_num), None)
+        if not step_data:
+            await message.answer(f"Шаг {step_num} не найден.")
+            return
+        user_state[message.from_user.id] = {"step": step_num, "pos": 0}
+        await run_step(message.chat.id, message.from_user.id)
+    except Exception as e:
+        await message.answer(f"Ошибка при запуске шага: {str(e)}")
