@@ -1,28 +1,17 @@
 import logging
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-import asyncio
 import os
 from steps import steps
+import asyncio
 
 API_TOKEN = os.getenv("TOKEN")
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
-
 logging.basicConfig(level=logging.INFO)
 
-# Хранилище состояний
-user_state = {}
+user_state = {}  # {user_id: {"step": 1, "pos": 0, "message_id": int}}
 
-# Кнопки управления во время шага
-def control_keyboard():
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add(InlineKeyboardButton("⏭️ Пропустить", callback_data="skip"))
-    keyboard.add(InlineKeyboardButton("⛔ Завершить", callback_data="stop"))
-    keyboard.add(InlineKeyboardButton("↩️ Назад на 2 шага", callback_data="back2"))
-    return keyboard
-
-# Приветствие
 WELCOME_TEXT = """Привет, солнце! ☀️
 Ты в таймере по методу суперкомпенсации.
 Кожа адаптируется к солнцу постепенно — и загар становится ровным, глубоким и без ожогов.
@@ -52,74 +41,84 @@ INFO_TEXT = """ℹ️ Инфо
 
 Если есть вопросы — пиши: @sunxbeach_director"""
 
-# Клавиатура шагов
 def step_keyboard():
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     for i in range(0, 12, 4):
         row = []
         for j in range(4):
-            if i + j < len(steps):
-                step_num = i + j + 1
-                duration = sum(pos['duration_min'] for pos in steps[i + j]['positions'])
-                h = int(duration) // 60
-                m = int(duration) % 60
+            idx = i + j
+            if idx < len(steps):
+                s = steps[idx]
+                total = sum(p['duration_min'] for p in s['positions'])
+                h = int(total) // 60
+                m = int(total) % 60
                 label = f"{h}ч {m}м" if h else f"{m}м"
-                row.append(types.KeyboardButton(f"Шаг {step_num} ({label})"))
-        keyboard.row(*row)
-    keyboard.add(types.KeyboardButton("ℹ️ Инфо"))
-    return keyboard
+                row.append(types.KeyboardButton(f"Шаг {s['step']} ({label})"))
+        kb.row(*row)
+    kb.add(types.KeyboardButton("ℹ️ Инфо"))
+    return kb
+
+def control_keyboard():
+    kb = InlineKeyboardMarkup()
+    kb.add(InlineKeyboardButton("⏭️ Пропустить", callback_data="skip"))
+    kb.add(InlineKeyboardButton("⛔ Завершить", callback_data="stop"))
+    kb.add(InlineKeyboardButton("↩️ Назад на 2 шага", callback_data="back2"))
+    kb.add(InlineKeyboardButton("📋 Вернуться к шагам", callback_data="back_to_menu"))
+    return kb
 
 @dp.message_handler(commands=["start"])
-async def start_handler(message: types.Message):
+async def start(message: types.Message):
     await message.answer(WELCOME_TEXT, reply_markup=step_keyboard())
 
 @dp.message_handler(lambda msg: msg.text == "ℹ️ Инфо")
-async def info_handler(message: types.Message):
+async def info(message: types.Message):
     await message.answer(INFO_TEXT)
 
 @dp.message_handler(lambda msg: msg.text.startswith("Шаг "))
-async def step_selected(message: types.Message):
+async def start_step(message: types.Message):
     try:
         step_num = int(message.text.split()[1])
         step_data = next(s for s in steps if s["step"] == step_num)
         user_state[message.from_user.id] = {"step": step_num, "pos": 0}
-        await proceed_next_position(message.from_user.id, message.chat.id)
+        await start_position_loop(message.chat.id, message.from_user.id)
     except:
-        await message.answer("Что-то пошло не так при выборе шага.")
+        await message.answer("Не удалось запустить шаг. Попробуй ещё раз.")
 
-async def proceed_next_position(user_id, chat_id):
-    state = user_state.get(user_id)
-    if not state:
-        return
-    step_data = next((s for s in steps if s["step"] == state["step"]), None)
-    if not step_data:
-        return
-    if state["pos"] >= len(step_data["positions"]):
-        await bot.send_message(chat_id, "Шаг завершён ✅", reply_markup=step_keyboard())
-        user_state.pop(user_id, None)
-        return
-    pos = step_data["positions"][state["pos"]]
-    mins = pos["duration_min"]
-    await bot.send_message(chat_id, f"{pos['name']} — {mins} мин", reply_markup=control_keyboard())
-    await asyncio.sleep(mins * 60)
-    state["pos"] += 1
-    await proceed_next_position(user_id, chat_id)
+async def start_position_loop(chat_id, user_id):
+    state = user_state[user_id]
+    step = next(s for s in steps if s["step"] == state["step"])
+    if state["pos"] == 0:
+        await bot.send_message(chat_id, f"Начинаем шаг {state['step']} ✅", reply_markup=control_keyboard())
+    while state["pos"] < len(step["positions"]):
+        pos = step["positions"][state["pos"]]
+        await bot.send_message(chat_id, f"{pos['name']} — {pos['duration_min']} мин")
+        await asyncio.sleep(int(pos["duration_min"] * 60))
+        if user_state.get(user_id) is None:
+            return
+        state["pos"] += 1
+    await bot.send_message(chat_id, "Шаг завершён ✅", reply_markup=step_keyboard())
+    user_state.pop(user_id, None)
 
-@dp.callback_query_handler(lambda c: c.data in ["skip", "stop", "back2"])
-async def callback_handler(callback: types.CallbackQuery):
+@dp.callback_query_handler(lambda c: c.data)
+async def handle_controls(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    if callback.data == "skip":
-        if user_id in user_state:
-            user_state[user_id]["pos"] += 1
-            await proceed_next_position(user_id, callback.message.chat.id)
-    elif callback.data == "stop":
+    chat_id = callback.message.chat.id
+    data = callback.data
+    state = user_state.get(user_id)
+
+    if data == "skip" and state:
+        state["pos"] += 1
+        await start_position_loop(chat_id, user_id)
+    elif data == "stop":
         user_state.pop(user_id, None)
-        await callback.message.answer("Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=step_keyboard())
-    elif callback.data == "back2":
-        if user_id in user_state:
-            user_state[user_id]["step"] = max(1, user_state[user_id]["step"] - 2)
-            user_state[user_id]["pos"] = 0
-            await proceed_next_position(user_id, callback.message.chat.id)
+        await bot.send_message(chat_id, "Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=step_keyboard())
+    elif data == "back2":
+        if state:
+            new_step = max(1, state["step"] - 2)
+            user_state[user_id] = {"step": new_step, "pos": 0}
+            await start_position_loop(chat_id, user_id)
+    elif data == "back_to_menu":
+        await bot.send_message(chat_id, "Выбери шаг 👇", reply_markup=step_keyboard())
     await callback.answer()
 
 if __name__ == "__main__":
