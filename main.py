@@ -6,7 +6,8 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.utils import executor
 from steps import steps
 
-API_TOKEN = "TOKEN"
+import os
+API_TOKEN = os.getenv("TOKEN")
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
