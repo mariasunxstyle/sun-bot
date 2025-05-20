@@ -58,6 +58,7 @@ def step_keyboard():
                 total = sum(p['duration_min'] for p in s['positions'])
                 h = int(total) // 60
                 m = int(total) % 60
+                step_num = s['step']
                 label = generate_wide_label(step_num, total)
                 row.append(types.KeyboardButton(f"Шаг {s['step']} ({label})"))
         kb.row(*row)
