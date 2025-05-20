@@ -12,6 +12,15 @@ logging.basicConfig(level=logging.INFO)
 user_state = {}
 
 def format_duration(dur):
+    minutes = int(dur)
+    hours = minutes // 60
+    mins = minutes % 60
+    if dur != int(dur):
+        return f"{dur} мин"
+    elif hours:
+        return f"{hours}ч {mins}м" if mins else f"{hours}ч"
+    else:
+        return f"{mins} мин"
     return f"{int(dur)} мин" if dur == int(dur) else f"{dur} мин"
 
 def step_keyboard():
@@ -25,7 +34,7 @@ def step_keyboard():
 
 def control_keyboard():
     return types.ReplyKeyboardMarkup(resize_keyboard=True).add(
-        types.KeyboardButton("⏭️ Пропустить")
+        types.KeyboardButton("⏭️ Продолжить")
     ).add(
         types.KeyboardButton("⛔ Завершить")
     ).add(
@@ -86,14 +95,21 @@ async def handle_step(message: types.Message):
     except Exception as e:
         await message.answer("Не удалось загрузить шаг")
 
-@dp.message_handler(lambda m: m.text in ["⏭️ Пропустить", "⛔ Завершить", "↩️ Назад на 2 шага", "📋 Вернуться к шагам"])
+
+@dp.message_handler(lambda m: m.text in ["⏭️ Продолжить", "⛔ Завершить", "↩️ Назад на 2 шага", "📋 Вернуться к шагам"])
 async def control(message: types.Message):
     uid = message.from_user.id
     if uid not in user_state:
         await message.answer("Сначала выбери шаг.")
         return
-    if message.text == "⏭️ Пропустить":
-        user_state[uid]["pos"] += 1
+    if message.text == "⏭️ Продолжить":
+        current = user_state[uid]['step']
+        next_step = current + 1
+        if next_step > 12:
+            await message.answer("Все шаги завершены!")
+            return
+        user_state[uid] = {"step": next_step, "pos": 0}
+        await message.answer(f"Шаг {next_step}")
         await run_step(message.chat.id, uid)
     elif message.text == "⛔ Завершить":
         await message.answer("Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=step_keyboard())
@@ -106,6 +122,5 @@ async def control(message: types.Message):
         user_state[uid] = {'step': new_step, 'pos': 0}
         await message.answer(f"Шаг {new_step}")
         await run_step(message.chat.id, uid)
-
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
