@@ -120,20 +120,23 @@ if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
 
 
+
 @dp.message_handler(lambda msg: "Шаг" in msg.text and "(" in msg.text)
 async def select_step(message: types.Message):
     try:
         import re
         match = re.search(r"Шаг (\d+)", message.text)
         if not match:
-            await message.answer("Не удалось распознать номер шага.")
+            await message.answer("⚠️ Не удалось распознать номер шага.")
             return
         step_num = int(match.group(1))
+        await message.answer(f"🛠 Определён шаг: {step_num}")
         step_data = next((s for s in steps if s["step"] == step_num), None)
         if not step_data:
-            await message.answer(f"Шаг {step_num} не найден.")
+            await message.answer(f"⚠️ Шаг {step_num} не найден в steps.")
             return
         user_state[message.from_user.id] = {"step": step_num, "pos": 0}
+        await message.answer(f"✅ Запускаю шаг {step_num}...")
         await run_step(message.chat.id, message.from_user.id)
     except Exception as e:
-        await message.answer(f"Ошибка при запуске шага: {str(e)}")
+        await message.answer(f"❌ Ошибка при запуске шага: {str(e)}")
