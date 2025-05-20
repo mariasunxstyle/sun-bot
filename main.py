@@ -97,10 +97,7 @@ async def start_position_loop(chat_id, user_id):
     state = user_state[user_id]
     step = next(s for s in steps if s["step"] == state["step"])
     if state["pos"] == 0:
-        await bot.send_message(chat_id, f"Начинаем шаг {state['step']} ✅", reply_markup=control_keyboard())
-    while state["pos"] < len(step["positions"]):
-        pos = step["positions"][state["pos"]]
-        await bot.send_message(chat_id, f"{pos['name']} — {pos['duration_min']} мин")
+        
         await asyncio.sleep(int(pos["duration_min"] * 60))
         if user_state.get(user_id) is None:
             return
