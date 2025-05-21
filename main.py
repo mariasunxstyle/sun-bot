@@ -79,7 +79,9 @@ async def run_step(chat_id, uid):
     if not step:
         return
     if state["pos"] >= len(step["positions"]):
-        await bot.send_message(chat_id, "Шаг завершён ✅", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(types.KeyboardButton("⏭️ Продолжить")).add(types.KeyboardButton("⛔ Завершить")).add(types.KeyboardButton("↩️ Назад на 2 шага")).add(types.KeyboardButton("📋 Вернуться к шагам")))
+        await bot.send_message(chat_id, "Шаг завершён ✅", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(
+            types.KeyboardButton("⏭️ Продолжить")).add(types.KeyboardButton("⛔ Завершить")).add(
+            types.KeyboardButton("↩️ Назад на 2 шага")).add(types.KeyboardButton("📋 Вернуться к шагам")))
         return
     pos = step["positions"][state["pos"]]
     await bot.send_message(chat_id, f"{pos['name']} — {format_duration(pos['duration_min'])}", reply_markup=control_keyboard())
@@ -117,29 +119,24 @@ async def control(message: types.Message):
             tasks[uid].cancel()
         tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
     elif message.text == "⛔ Завершить":
-        await message.answer("Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(types.KeyboardButton("↩️ Назад на 2 шага")).add(types.KeyboardButton("📋 Вернуться к шагам")))
-        user_state.pop(uid, None)
-        if uid in tasks:
+        if uid in tasks and not tasks[uid].done():
             tasks[uid].cancel()
+        await message.answer("Сеанс завершён. Можешь вернуться позже и начать заново ☀️",
+            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(
+                types.KeyboardButton("↩️ Назад на 2 шага")).add(
+                types.KeyboardButton("📋 Вернуться к шагам")))
     elif message.text == "📋 Вернуться к шагам":
         if uid in tasks and not tasks[uid].done():
             tasks[uid].cancel()
-        await message.answer("Выбери шаг:", reply_markup=step_keyboard())
+        user_state.pop(uid, None)
         await message.answer("Выбери шаг:", reply_markup=step_keyboard())
     elif message.text == "↩️ Назад на 2 шага":
         if uid in tasks and not tasks[uid].done():
             tasks[uid].cancel()
-        current = user_state[uid]['step']
+        current = user_state.get(uid, {}).get("step", 1)
         new_step = max(1, current - 2)
-        user_state[uid] = {'step': new_step, 'pos': 0}
+        user_state[uid] = {"step": new_step, "pos": 0}
         await message.answer(f"Шаг {new_step}")
-        tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
-        current = user_state[uid]['step']
-        new_step = max(1, current - 2)
-        user_state[uid] = {'step': new_step, 'pos': 0}
-        await message.answer(f"Шаг {new_step}")
-        if uid in tasks and not tasks[uid].done():
-            tasks[uid].cancel()
         tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
 
 if __name__ == "__main__":
