@@ -11,6 +11,7 @@ dp = Dispatcher(bot)
 logging.basicConfig(level=logging.INFO)
 
 user_state = {}
+tasks = {}
 
 def format_duration(dur):
     minutes = int(dur)
@@ -74,13 +75,15 @@ async def info(message: types.Message):
 
 async def run_step(chat_id, uid):
     state = user_state[uid]
-    step = next(s for s in steps if s['step'] == state['step'])
-    if state['pos'] >= len(step['positions']):
+    step = next((s for s in steps if s["step"] == state["step"]), None)
+    if not step:
+        return
+    if state["pos"] >= len(step["positions"]):
         await bot.send_message(chat_id, "Шаг завершён ✅", reply_markup=control_keyboard())
         return
     pos = step["positions"][state["pos"]]
     await bot.send_message(chat_id, f"{pos['name']} — {format_duration(pos['duration_min'])}", reply_markup=control_keyboard())
-    await asyncio.sleep(pos['duration_min'] * 60)
+    await asyncio.sleep(int(pos["duration_min"] * 60))
     state["pos"] += 1
     await run_step(chat_id, uid)
 
@@ -90,7 +93,9 @@ async def handle_step(message: types.Message):
     try:
         step_num = int(message.text.split(" ")[1])
         user_state[uid] = {"step": step_num, "pos": 0}
-        await run_step(message.chat.id, uid)
+        if uid in tasks and not tasks[uid].done():
+            tasks[uid].cancel()
+        tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
     except Exception:
         await message.answer("Не удалось загрузить шаг")
 
@@ -108,10 +113,14 @@ async def control(message: types.Message):
             return
         user_state[uid] = {"step": next_step, "pos": 0}
         await message.answer(f"Шаг {next_step}")
-        await run_step(message.chat.id, uid)
+        if uid in tasks and not tasks[uid].done():
+            tasks[uid].cancel()
+        tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
     elif message.text == "⛔ Завершить":
         await message.answer("Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=step_keyboard())
         user_state.pop(uid, None)
+        if uid in tasks:
+            tasks[uid].cancel()
     elif message.text == "📋 Вернуться к шагам":
         await message.answer("Выбери шаг:", reply_markup=step_keyboard())
     elif message.text == "↩️ Назад на 2 шага":
@@ -119,7 +128,9 @@ async def control(message: types.Message):
         new_step = max(1, current - 2)
         user_state[uid] = {'step': new_step, 'pos': 0}
         await message.answer(f"Шаг {new_step}")
-        await run_step(message.chat.id, uid)
+        if uid in tasks and not tasks[uid].done():
+            tasks[uid].cancel()
+        tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
