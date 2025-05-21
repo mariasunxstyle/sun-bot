@@ -1,3 +1,4 @@
+
 import logging
 import asyncio
 from aiogram import Bot, Dispatcher, types, executor
@@ -21,13 +22,12 @@ def format_duration(dur):
         return f"{hours}ч {mins}м" if mins else f"{hours}ч"
     else:
         return f"{mins} мин"
-    return f"{int(dur)} мин" if dur == int(dur) else f"{dur} мин"
 
 def step_keyboard():
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
     for step in steps:
         total = sum(p['duration_min'] for p in step['positions'])
-        label = f"{step['step']} ({format_duration(total)})"
+        label = f"Шаг {step['step']} ({format_duration(total)})"
         keyboard.insert(types.KeyboardButton(label))
     keyboard.add(types.KeyboardButton("ℹ️ Инфо"))
     return keyboard
@@ -76,8 +76,7 @@ async def run_step(chat_id, uid):
     state = user_state[uid]
     step = next(s for s in steps if s['step'] == state['step'])
     if state['pos'] >= len(step['positions']):
-        await bot.send_message(chat_id, "Шаг завершён ✅")
-        await bot.send_message(chat_id, "Выбери, что дальше:", reply_markup=control_keyboard())
+        await bot.send_message(chat_id, "Шаг завершён ✅", reply_markup=control_keyboard())
         return
     pos = step["positions"][state["pos"]]
     await bot.send_message(chat_id, f"{pos['name']} — {format_duration(pos['duration_min'])}", reply_markup=control_keyboard())
@@ -89,12 +88,11 @@ async def run_step(chat_id, uid):
 async def handle_step(message: types.Message):
     uid = message.from_user.id
     try:
-        step_num = int(message.text.split(" ")[0])
+        step_num = int(message.text.split(" ")[1])
         user_state[uid] = {"step": step_num, "pos": 0}
         await run_step(message.chat.id, uid)
-    except Exception as e:
+    except Exception:
         await message.answer("Не удалось загрузить шаг")
-
 
 @dp.message_handler(lambda m: m.text in ["⏭️ Продолжить", "⛔ Завершить", "↩️ Назад на 2 шага", "📋 Вернуться к шагам"])
 async def control(message: types.Message):
@@ -106,7 +104,7 @@ async def control(message: types.Message):
         current = user_state[uid]['step']
         next_step = current + 1
         if next_step > 12:
-            await message.answer("Все шаги завершены!")
+            await message.answer("Все шаги завершены!", reply_markup=step_keyboard())
             return
         user_state[uid] = {"step": next_step, "pos": 0}
         await message.answer(f"Шаг {next_step}")
@@ -122,5 +120,6 @@ async def control(message: types.Message):
         user_state[uid] = {'step': new_step, 'pos': 0}
         await message.answer(f"Шаг {new_step}")
         await run_step(message.chat.id, uid)
+
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
