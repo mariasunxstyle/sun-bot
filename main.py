@@ -122,8 +122,18 @@ async def control(message: types.Message):
         if uid in tasks:
             tasks[uid].cancel()
     elif message.text == "📋 Вернуться к шагам":
+        if uid in tasks and not tasks[uid].done():
+            tasks[uid].cancel()
+        await message.answer("Выбери шаг:", reply_markup=step_keyboard())
         await message.answer("Выбери шаг:", reply_markup=step_keyboard())
     elif message.text == "↩️ Назад на 2 шага":
+        if uid in tasks and not tasks[uid].done():
+            tasks[uid].cancel()
+        current = user_state[uid]['step']
+        new_step = max(1, current - 2)
+        user_state[uid] = {'step': new_step, 'pos': 0}
+        await message.answer(f"Шаг {new_step}")
+        tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
         current = user_state[uid]['step']
         new_step = max(1, current - 2)
         user_state[uid] = {'step': new_step, 'pos': 0}
