@@ -1,3 +1,10 @@
+async def is_subscribed(user_id):
+    try:
+        member = await bot.get_chat_member(f"@{CHANNEL_USERNAME}", user_id)
+        return member.status in ["member", "creator", "administrator"]
+    except:
+        return False
+
 
 import logging
 import asyncio
@@ -6,6 +13,7 @@ import os
 from steps import steps
 
 API_TOKEN = os.getenv("TOKEN")
+CHANNEL_USERNAME = "sunxstyle"
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 logging.basicConfig(level=logging.INFO)
@@ -45,6 +53,12 @@ def control_keyboard():
     )
 
 @dp.message_handler(commands=["start"])
+async def start(message: types.Message):
+    if not await is_subscribed(message.from_user.id):
+        kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        kb.add(types.KeyboardButton("🔄 Проверить ещё раз"))
+        return await message.answer("Бот работает только для подписчиков канала @sunxstyle.\n\nПожалуйста, подпишись — и нажми «🔄 Проверить ещё раз»", reply_markup=kb)
+
 async def start(message: types.Message):
     welcome = (
         "Привет, солнце! ☀️\n"
@@ -129,7 +143,7 @@ async def control(message: types.Message):
         if uid in tasks and not tasks[uid].done():
             tasks[uid].cancel()
         user_state.pop(uid, None)
-        await message.answer("Выбери шаг:", reply_markup=step_keyboard())
+        await message.answer(reply_markup=step_keyboard())
     elif message.text == "↩️ Назад на 2 шага":
         if uid in tasks and not tasks[uid].done():
             tasks[uid].cancel()
