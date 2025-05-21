@@ -5,8 +5,11 @@ import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.utils import executor
 from steps import steps
+import json
+from datetime import datetime
 
 API_TOKEN = os.getenv("TOKEN")
+ADMIN_ID = 496676878
 CHANNEL_USERNAME = "sunxstyle"
 
 logging.basicConfig(level=logging.INFO)
@@ -41,8 +44,6 @@ user_state = {}
 tasks = {}
 
 def format_time(mins):
-    if mins < 1:
-        return f"{int(mins * 60)} сек"
     h = int(mins // 60)
     m = int(mins % 60)
     return f"{h}ч {m}м" if h else f"{m}м"
@@ -77,6 +78,23 @@ async def is_subscribed(user_id):
     except:
         return False
 
+def save_user(uid, name, lang, subscribed):
+    entry = {
+        "id": uid,
+        "name": name,
+        "lang": lang,
+        "subscribed": subscribed,
+        "time": datetime.utcnow().isoformat()
+    }
+    try:
+        with open("users.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except:
+        data = []
+    data.append(entry)
+    with open("users.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
 async def run_step(chat_id, uid):
     state = user_state[uid]
     step = steps[state["step"] - 1]
@@ -88,29 +106,45 @@ async def run_step(chat_id, uid):
 
     pos = step["positions"][pos_idx]
     await bot.send_message(chat_id, f"{pos['name']} — {format_time(pos['duration_min'])}", reply_markup=control_keyboard())
-
     await asyncio.sleep(int(pos['duration_min'] * 60))
-
     state["pos"] += 1
     tasks[uid] = asyncio.create_task(run_step(chat_id, uid))
 
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
-    if not await is_subscribed(message.from_user.id):
+    uid = message.from_user.id
+    subscribed = await is_subscribed(uid)
+    save_user(uid, message.from_user.full_name, message.from_user.language_code, subscribed)
+    if not subscribed:
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        kb.add(types.KeyboardButton("🔄 Проверить ещё раз"))
+        kb.add("🔄 Проверить ещё раз")
         return await message.answer(
             "Бот работает только для подписчиков канала @sunxstyle.\n\nПожалуйста, подпишись — и нажми «🔄 Проверить ещё раз»", reply_markup=kb)
     await message.answer(WELCOME_TEXT, reply_markup=step_keyboard())
 
 @dp.message_handler(lambda m: m.text == "🔄 Проверить ещё раз")
 async def check_again(message: types.Message):
-    if await is_subscribed(message.from_user.id):
+    uid = message.from_user.id
+    if await is_subscribed(uid):
         await message.answer("Готово! ☀️", reply_markup=step_keyboard())
     else:
         kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        kb.add(types.KeyboardButton("🔄 Проверить ещё раз"))
+        kb.add("🔄 Проверить ещё раз")
         await message.answer("Бот работает только для подписчиков канала @sunxstyle.\n\nПожалуйста, подпишись — и нажми «🔄 Проверить ещё раз»", reply_markup=kb)
+
+@dp.message_handler(commands=["admin"])
+async def admin_report(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    try:
+        with open("users.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        total = len(data)
+        subs = sum(1 for x in data if x["subscribed"])
+        nsubs = total - subs
+        await message.answer(f"📊 Отчёт Sunxstyle:\n— Всего запусков: {total}\n— Подписались: {subs}\n— Не подписались: {nsubs}")
+    except:
+        await message.answer("Нет данных.")
 
 @dp.message_handler()
 async def handle_step(message: types.Message):
@@ -119,6 +153,7 @@ async def handle_step(message: types.Message):
     if message.text.startswith("Шаг"):
         step_num = int(message.text.split()[1])
         user_state[uid] = {"step": step_num, "pos": 0}
+        await message.answer(f"Шаг {step_num}")
         tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
 
     elif message.text == "↩️ Назад на 2 шага":
@@ -129,7 +164,7 @@ async def handle_step(message: types.Message):
         tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
 
     elif message.text == "📋 Вернуться к шагам":
-        await message.answer(reply_markup=step_keyboard())
+        await message.answer("Выбери шаг:", reply_markup=step_keyboard())
 
     elif message.text == "⏭️ Пропустить":
         if uid in user_state:
@@ -137,7 +172,7 @@ async def handle_step(message: types.Message):
             tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
 
     elif message.text == "⛔ Завершить":
-        await message.answer("Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=step_keyboard())
+        await message.answer("Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=control_keyboard())
 
     elif message.text == "⏭️ Продолжить":
         user_state[uid]["step"] += 1
