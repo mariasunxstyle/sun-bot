@@ -35,7 +35,7 @@ def step_keyboard():
 
 def control_keyboard():
     return types.ReplyKeyboardMarkup(resize_keyboard=True).add(
-        types.KeyboardButton("⏭️ Продолжить")
+        types.KeyboardButton("⏭️ Пропустить")
     ).add(
         types.KeyboardButton("⛔ Завершить")
     ).add(
@@ -79,7 +79,7 @@ async def run_step(chat_id, uid):
     if not step:
         return
     if state["pos"] >= len(step["positions"]):
-        await bot.send_message(chat_id, "Шаг завершён ✅", reply_markup=control_keyboard())
+        await bot.send_message(chat_id, "Шаг завершён ✅", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(types.KeyboardButton("⏭️ Продолжить")).add(types.KeyboardButton("⛔ Завершить")).add(types.KeyboardButton("↩️ Назад на 2 шага")).add(types.KeyboardButton("📋 Вернуться к шагам")))
         return
     pos = step["positions"][state["pos"]]
     await bot.send_message(chat_id, f"{pos['name']} — {format_duration(pos['duration_min'])}", reply_markup=control_keyboard())
@@ -117,7 +117,7 @@ async def control(message: types.Message):
             tasks[uid].cancel()
         tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
     elif message.text == "⛔ Завершить":
-        await message.answer("Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=step_keyboard())
+        await message.answer("Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(types.KeyboardButton("↩️ Назад на 2 шага")).add(types.KeyboardButton("📋 Вернуться к шагам")))
         user_state.pop(uid, None)
         if uid in tasks:
             tasks[uid].cancel()
