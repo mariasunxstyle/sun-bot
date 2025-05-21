@@ -154,16 +154,18 @@ async def handle_step(message: types.Message):
         step_num = int(message.text.split()[1])
         user_state[uid] = {"step": step_num, "pos": 0}
         
-        tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
-            return
+        if uid in tasks:
+        tasks[uid].cancel()
+    tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
 
     elif message.text == "↩️ Назад на 2 шага":
         current = user_state.get(uid, {"step": 3})["step"]
         step_num = max(1, current - 2)
         user_state[uid] = {"step": step_num, "pos": 0}
         
-        tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
-            return
+        if uid in tasks:
+        tasks[uid].cancel()
+    tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
 
     elif message.text == "📋 Вернуться к шагам":
         await message.answer(reply_markup=step_keyboard())
@@ -171,8 +173,9 @@ async def handle_step(message: types.Message):
     elif message.text == "⏭️ Пропустить":
         if uid in user_state:
             user_state[uid]["pos"] += 1
-            tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
-            return
+            if uid in tasks:
+        tasks[uid].cancel()
+    tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
 
     elif message.text == "⛔ Завершить":
         await message.answer("Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=control_keyboard())
@@ -181,8 +184,9 @@ async def handle_step(message: types.Message):
         user_state[uid]["step"] += 1
         user_state[uid]["pos"] = 0
         await message.answer(f"Шаг {user_state[uid]['step']}")
-        tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
-            return
+        if uid in tasks:
+        tasks[uid].cancel()
+    tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
 
     elif message.text == "ℹ️ Инфо":
         await message.answer(INFO_TEXT)
