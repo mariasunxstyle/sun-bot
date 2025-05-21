@@ -106,7 +106,7 @@ async def run_step(chat_id, uid):
 
     pos = step["positions"][pos_idx]
     await bot.send_message(chat_id, f"{pos['name']} — {format_time(pos['duration_min'])}", reply_markup=control_keyboard())
-    await asyncio.sleep(int(pos['duration_min'] * 60))
+    await asyncio.sleep(round(pos['duration_min'] * 60))
     state["pos"] += 1
     tasks[uid] = asyncio.create_task(run_step(chat_id, uid))
 
@@ -153,23 +153,26 @@ async def handle_step(message: types.Message):
     if message.text.startswith("Шаг"):
         step_num = int(message.text.split()[1])
         user_state[uid] = {"step": step_num, "pos": 0}
-        await message.answer(f"Шаг {step_num}")
+        
         tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
+            return
 
     elif message.text == "↩️ Назад на 2 шага":
         current = user_state.get(uid, {"step": 3})["step"]
         step_num = max(1, current - 2)
         user_state[uid] = {"step": step_num, "pos": 0}
-        await message.answer(f"Шаг {step_num}")
+        
         tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
+            return
 
     elif message.text == "📋 Вернуться к шагам":
-        await message.answer("Выбери шаг:", reply_markup=step_keyboard())
+        await message.answer(reply_markup=step_keyboard())
 
     elif message.text == "⏭️ Пропустить":
         if uid in user_state:
             user_state[uid]["pos"] += 1
             tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
+            return
 
     elif message.text == "⛔ Завершить":
         await message.answer("Сеанс завершён. Можешь вернуться позже и начать заново ☀️", reply_markup=control_keyboard())
@@ -179,6 +182,7 @@ async def handle_step(message: types.Message):
         user_state[uid]["pos"] = 0
         await message.answer(f"Шаг {user_state[uid]['step']}")
         tasks[uid] = asyncio.create_task(run_step(message.chat.id, uid))
+            return
 
     elif message.text == "ℹ️ Инфо":
         await message.answer(INFO_TEXT)
