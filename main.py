@@ -1,23 +1,18 @@
-from aiogram import Bot, Dispatcher, types, executor
-import asyncio, os
+# main.py (упрощённый шаблон, допиши в нужной логике)
+from aiogram import Bot, Dispatcher, executor, types
+import logging
+import os
 from steps import steps
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+
 API_TOKEN = os.getenv("TOKEN")
+
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
+logging.basicConfig(level=logging.INFO)
+
 @dp.message_handler(commands=['start'])
-async def start_handler(message: types.Message):
-    kb = ReplyKeyboardMarkup(resize_keyboard=True)
-    for step in steps:
-        label = f"{step['step']} ({format_duration(step['duration_min'])})"
-        kb.add(KeyboardButton(label))
-    kb.add(KeyboardButton("ℹ️ Инфо"))
-    await message.answer("Привет, солнце! ☀️", reply_markup=kb)
-def format_duration(mins):
-    h = int(mins) // 60
-    m = int(mins) % 60
-    if h:
-        return f"{h}ч {m}м" if m else f"{h}ч"
-    return f"{m}м"
+async def send_welcome(message: types.Message):
+    await message.answer("Привет, солнце! ☀️")
+
 if __name__ == '__main__':
-    executor.start_polling(dp)
+    executor.start_polling(dp, skip_updates=True)
